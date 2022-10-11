@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const {error: stripeError} = await stripe.confirmCardPayment(clientSecret, {
       payment_method: {
         card: card,
-      }
+      },
     });
 
     if (stripeError) {
@@ -95,6 +95,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // Redirect to success page 
-    window.location.href = `${window.location.origin}/return.html?payment_intent_client_secret=${clientSecret}&redirect_status=succeeded`
+    // Redirect to success page
+    window.location.href = `${window.location.origin}/return.html?payment_intent_client_secret=${clientSecret}&redirect_status=succeeded`;
   });
+});
