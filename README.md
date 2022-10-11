@@ -1,3 +1,5 @@
+**Do you want to see this repo in action? Head over [here](https://stripe-card-filtering-demo.glitch.me/)**
+
 # Card filtering 
 
 At times merchants may want to block payments done through a specific card brand or funding type. Since, for compliance reasons, the PAN is provided by the end customer directly to Stripe (e.g. using Stripe Elements) merchants need a way to detect what card brand has been used before confirming the payment. 
