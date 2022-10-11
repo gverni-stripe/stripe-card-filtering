@@ -45,9 +45,11 @@ app.get('/create-payment-intent', async (req, res) => {
   // [0] https://stripe.com/docs/api/payment_intents/create
   try {
     const paymentIntent = await stripe.paymentIntents.create({
-      currency: 'EUR',
+      currency: 'gbp',
       amount: 1999,
-      automatic_payment_methods: { enabled: true }
+      metadata: {
+        app: "card-filtering-demo"
+      }
     });
 
     // Send publishable key and PaymentIntent details to client

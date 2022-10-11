@@ -1,98 +1,63 @@
-# Accept a payment
+# Card filtering 
 
-_Learn how to securely accept payments online._
+At times merchants may want to block payments done through a specific card brand or funding type. Since, for compliance reasons, the PAN is provided by the end customer directly to Stripe (e.g. using Stripe Elements) merchants need a way to detect what card brand has been used before confirming the payment. 
 
-This repository includes examples of 3 types of integration.
+This can be achieved using Radar rules, but in this repo we present some examples using: 
+* Card Element
+* Payment Element 
 
-|[Prebuilt Checkout page](./prebuilt-checkout-page) ([docs](https://stripe.com/docs/payments/accept-a-payment?ui=checkout))| [Payment Element](./payment-element) ([docs](https://stripe.com/docs/payments/accept-a-payment?platform=web&ui=elements)) | [Custom payment flow](./custom-payment-flow) ([docs](https://stripe.com/docs/payments/accept-card-payments?platform=web&ui=elements)) |
-|---|---|---|
-| Lower complexity. | Moderate complexity. | Higher complexity. |
-| Customize logo, images, and colors. | Customize components with [Appearance API](https://stripe.com/docs/stripe-js/appearance-api). | Customize all components with CSS. |
-| Add payment method types with a single line change. | Add payment methods with a single line change. | Implement each payment method type as a custom integration. |
-| Built-in support for Apple Pay, and Google Pay. | Built-in support for Apple Pay and Google Pay. | Integrate Apple Pay and Google Pay with extra code.|
-| Redirect to Stripe hosted page. | Customers stay on your site, but payment completion triggers a redirect. |Customers stay on your site. |
-| Small refactor to collect recurring payments. | Large refactor to collect recurring payments. | Large refactor to collect recurring payments. |
-| Input validation and error handling built in. | Input validation built-in but you must implement error handling. | Implement your own input validation and error handling. |
-| Localized in 25+ languages. | Localized in 25+ languages. |Implement your own localization. |
-| Automate calculation and collection of sales tax, VAT and GST with one line of code. | Implement your own logic to automate taxes on your transactions. | Implement your own logic to automate taxes on your transactions. |
+Below a comparison of the two methods
 
 
-### Payment Method Type Support
+| Element | Pros | Cons |
+| --- | --- | --- |
+| `cardElement` |  <li>Card brand is recognised while typing (slightly better UX)</li><li>No beta feature needed</li> | <li>Card funding filtering not possible</li><li>Support for other payment methods requires more effort</li> |
+| `paymentElement`   | <li>Easy to add other payment method</li><li>Advanced card filtering (e.g. funding)</li> | <li>Customer need to provide full card number and press pay </li><li>Credit card icon is shown as available</li><li>Beta feature</li> |
 
-|Payment Method Type | [Prebuilt Checkout page](./prebuilt-checkout-page) ([docs](https://stripe.com/docs/payments/accept-a-payment?ui=checkout))| [Payment Element](./payment-element) ([docs](https://stripe.com/docs/payments/accept-a-payment?platform=web&ui=elements)) | [Custom payment flow](./custom-payment-flow) ([docs](https://stripe.com/docs/payments/accept-card-payments?platform=web&ui=elements)) |
-|---|---|---|---|
-|ACH Credit Transfer|  |  | |
-|ACH Debit| ✅ | ✅ | ✅ |
-|Afterpay/Clearpay| ✅ | ✅ | ✅ |
-|Alipay| ✅ | ✅ | ✅ |
-|Apple Pay| ✅ | ✅ | ✅ |
-|Bacs Direct Debit| ✅ |  |  |
-|Bancontact| ✅ | ✅ | ✅ |
-|BECS Direct Debit| ✅ | ✅ | ✅ |
-|Boleto| ✅ | ✅ | ✅ |
-|Cards| ✅ | ✅ | ✅ |
-|EPS| ✅ | ✅ | ✅ |
-|FPX| ✅ | ✅ | ✅ |
-|giropay| ✅ | ✅ | ✅ |
-|Google Pay| ✅ | ✅ | ✅ |
-|GrabPay| ✅ | ✅ | ✅ |
-|iDEAL| ✅ | ✅ | ✅ |
-|Klarna| ✅ | ✅ | ✅ |
-|Multibanco| ✅ | ✅ |  |
-|OXXO| ✅ | ✅ | ✅ |
-|Przelewy24 (P24)| ✅ | ✅ | ✅ |
-|SEPA Direct Debit| ✅ | ✅ | ✅ |
-|Sofort| ✅ | ✅ | ✅ |
-|WeChat Pay| ✅ | ✅ | ✅ |
+For a more in depth comparison of `cardElement` and `paymentElement` check [here](https://stripe.com/docs/payments/payment-card-element-comparison). 
 
+## Use `cardElement` to filter by card brand(s)
 
-## Installation
+This example leverage the [`card.on('change', handle)`](https://stripe.com/docs/js/element/events/on_change?type=cardElement) event handler. Every time there is a change in the `cardElement` the handler can use the [`event.brand`](https://stripe.com/docs/js/element/events/on_change?type=cardElement#element_on_change-handler-brand) to check what card brand has been provided by the customer, e.g: 
 
-The recommended way to use this Stripe Sample is with the [Stripe CLI](https://stripe.com/docs/stripe-cli#install):
-
-```sh
-stripe samples create accept-a-payment
+```
+card.on('change', function (event) {
+    if (event.brand === 'amex') {
+      // Handle AMEX card
+    }
+    ...
+})
 ```
 
-You can also clone the repository, but there is a bit more manual setup work to
-configure the `.env` environment variable file in the server directory.
+Note that this is happening in realtime as soon as the card is recongised (e.g. no need for the customer to provide the full card number)
 
-You'll find more detailed instructions for each integration type in the
-relevant READMEs:
+## Use `paymentElement` to filter by card brand(s) or funding type 
 
-- [Prebuilt Checkout page](./prebuilt-checkout-page/README.md)
-- [Payment Element](./payment-element/README.md)
-- [Custom payment flow](./custom-payment-flow/README.md)
+Note: This example uses a [beta feature](https://stripe.com/docs/payments/run-custom-actions-before-confirmation). Contact Stripe sale to enable the feature. 
 
----
-## FAQ
+In this example, the beta `updatePaymentIntent()` is used to fetch the payment intent after the card is provided and before it's confirmed. During this phase, the card attached to the payment intent can be checked, for example to see which brand the card is: 
 
-Q: Why did you pick these frameworks?
+```
+if (result.paymentIntent.payment_method.card.brand === 'amex') {
+  // Handle AMEX cards
+}
+```
+# How to use this repo 
 
-A: We chose the most minimal framework to convey the key Stripe calls and
-concepts you need to understand. These demos are meant as an educational tool
-that helps you roadmap how to integrate Stripe within your own system
-independent of the framework.
+* Clone the repo locally 
+* Copy `.env.example` to `'/server/.env`
+* Fill in the values for the following variables (you can leave the rest as they are)
+  * `STRIPE_PUBLISHABLE_KEY`
+  * `STRIPE_SECRET_KEY`
+* Install dependencies
+```
+cd server
+npm install
+```
+* Run the server
+``
+(cd server)
+npm start
+``
+* Open a browser to [`https//localhost:4242`](https//localhost:4242)
 
-## Get support
-
-If you found a bug or want to suggest a new [feature/use case/sample], please [file an issue](../../issues).
-
-If you have questions, comments, or need help with code, we're here to help:
-- on [Discord](https://stripe.com/go/developer-chat)
-- on Twitter at [@StripeDev](https://twitter.com/StripeDev)
-- on Stack Overflow at the [stripe-payments](https://stackoverflow.com/tags/stripe-payments/info) tag
-
-Sign up to [stay updated with developer news](https://go.stripe.global/dev-digest).
-
-
-### E2E testing
-
-[Readme](./spec/README.md)
-
-## Authors
-
-- [@cjav_dev](https://twitter.com/cjav_dev)
-- [@thorwebdev](https://twitter.com/thorwebdev)
-- [@aliriaz](https://github.com/aliriaz-stripe)
-- [@charlesw](https://twitter.com/charlesw_dev)

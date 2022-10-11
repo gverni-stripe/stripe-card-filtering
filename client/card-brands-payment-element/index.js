@@ -10,16 +10,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   const stripe = Stripe(publishableKey, {
-    apiVersion: '2020-08-27',
+    betas: ['server_side_confirmation_beta_1'],
+    apiVersion: '2020-08-27;server_side_confirmation_beta=v1',
   });
+
+  function setLoading(loading) {
+    // reenable the form.
+    submitted = loading;
+    if (loading) {
+      form.querySelector('#card-brand-error').style.display = 'none';
+    }
+    form.querySelector('button').disabled = loading;
+  }
 
   // On page load, we create a PaymentIntent on the server so that we have its clientSecret to
   // initialize the instance of Elements below. The PaymentIntent settings configure which payment
   // method types to display in the PaymentElement.
-  const {
-    error: backendError,
-    clientSecret
-  } = await fetch('/create-payment-intent').then(r => r.json());
+  const {error: backendError, clientSecret} = await fetch(
+    '/create-payment-intent'
+  ).then((r) => r.json());
   if (backendError) {
     addMessage(backendError.message);
   }
@@ -27,7 +36,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Initialize Stripe Elements with the PaymentIntent's clientSecret,
   // then mount the payment element.
-  const elements = stripe.elements({ clientSecret });
+  const elements = stripe.elements({clientSecret});
   const paymentElement = elements.create('payment');
   paymentElement.mount('#payment-element');
 
@@ -38,11 +47,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.preventDefault();
 
     // Disable double submission of the form
-    if(submitted) { return; }
-    submitted = true;
-    form.querySelector('button').disabled = true;
+    if (submitted) {
+      return;
+    }
+    setLoading(true);
 
     const nameInput = document.querySelector('#name');
+
+    // Update the payment intent with the payment information
+    const result = await stripe.updatePaymentIntent({
+      elements,
+      params: {
+        expand: ['payment_method'],
+      },
+    });
+
+    if (result.error) {
+      if (
+        result.error.type === 'card_error' ||
+        result.error.type === 'validation_error'
+      ) {
+        addMessage(error.message);
+      } else {
+        addMessage('An unexpected error occurred.');
+      }
+      setLoading(false);
+      return;
+    } else {
+      if (result.paymentIntent.payment_method.card.brand === 'amex') {
+        form.querySelector('#card-brand-error').style.display = 'initial';
+        form.querySelector('#card-brand-error').textContent = 'AMEX not supported. Please use another card'
+        setLoading(false);
+        return;
+      }
+    }
 
     // Confirm the card payment given the clientSecret
     // from the payment intent that was just created on
@@ -51,15 +89,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       elements,
       confirmParams: {
         return_url: `${window.location.origin}/return.html`,
-      }
+      },
     });
 
     if (stripeError) {
       addMessage(stripeError.message);
-
-      // reenable the form.
-      submitted = false;
-      form.querySelector('button').disabled = false;
+      setLoading(false);
       return;
     }
   });
